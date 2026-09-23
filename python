@@ -1,0 +1,127 @@
+"""Snake game using Python's built-in tkinter (no pip install needed).
+ 
+Controls: Arrow keys or WASD to steer, Space to pause, R to restart.
+Run with:  python snake.py
+"""
+import random
+import tkinter as tk
+ 
+GRID = 21          # cells per side
+CELL = 22          # pixels per cell
+SIZE = GRID * CELL
+BASE_DELAY = 130   # ms per move at the start
+MIN_DELAY = 60     # fastest speed
+ 
+BG, TILE = "#17362a", "#1c4032"
+HEAD, BODY, FOOD = "#eaffc4", "#b8e986", "#ff6b57"
+ 
+DIRS = {"Up": (0, -1), "Down": (0, 1), "Left": (-1, 0), "Right": (1, 0)}
+KEYS = {"w": "Up", "s": "Down", "a": "Left", "d": "Right"}
+OPPOSITE = {"Up": "Down", "Down": "Up", "Left": "Right", "Right": "Left"}
+ 
+ 
+class SnakeGame:
+    def __init__(self, root):
+        self.root = root
+        root.title("Snake")
+        root.resizable(False, False)
+ 
+        self.label = tk.Label(root, font=("Georgia", 14))
+        self.label.pack(pady=(8, 4))
+        self.canvas = tk.Canvas(root, width=SIZE, height=SIZE, bg=BG,
+                                highlightthickness=0)
+        self.canvas.pack(padx=10, pady=(0, 10))
+ 
+        root.bind("<Key>", self.on_key)
+        self.best = 0
+        self.reset()
+        self.tick()
+ 
+    def reset(self):
+        self.snake = [(10, 10), (9, 10), (8, 10)]   # head is index 0
+        self.direction = "Right"
+        self.next_direction = "Right"
+        self.score = 0
+        self.paused = False
+        self.game_over = False
+        self.place_food()
+        self.draw()
+ 
+    def place_food(self):
+        free = [(x, y) for x in range(GRID) for y in range(GRID)
+                if (x, y) not in self.snake]
+        self.food = random.choice(free)
+ 
+    def on_key(self, event):
+        key = KEYS.get(event.keysym.lower(), event.keysym)
+        if key in DIRS:
+            # Ignore a 180-degree turn (snake can't reverse into itself)
+            if key != OPPOSITE[self.direction]:
+                self.next_direction = key
+        elif event.keysym == "space" and not self.game_over:
+            self.paused = not self.paused
+            self.draw()
+        elif event.keysym.lower() == "r":
+            self.reset()
+ 
+    def tick(self):
+        if not self.paused and not self.game_over:
+            self.step()
+        delay = max(MIN_DELAY, BASE_DELAY - self.score * 3)
+        self.root.after(delay, self.tick)
+ 
+    def step(self):
+        self.direction = self.next_direction
+        dx, dy = DIRS[self.direction]
+        head = (self.snake[0][0] + dx, self.snake[0][1] + dy)
+ 
+        hit_wall = not (0 <= head[0] < GRID and 0 <= head[1] < GRID)
+        if hit_wall or head in self.snake:
+            self.game_over = True
+            self.best = max(self.best, self.score)
+        else:
+            self.snake.insert(0, head)
+            if head == self.food:
+                self.score += 1
+                self.place_food()
+            else:
+                self.snake.pop()   # no food eaten: tail moves forward
+        self.draw()
+ 
+    def draw(self):
+        c = self.canvas
+        c.delete("all")
+        for x in range(GRID):
+            for y in range(GRID):
+                if (x + y) % 2 == 0:
+                    c.create_rectangle(x * CELL, y * CELL,
+                                       (x + 1) * CELL, (y + 1) * CELL,
+                                       fill=TILE, outline="")
+        fx, fy = self.food
+        c.create_oval(fx * CELL + 3, fy * CELL + 3,
+                      (fx + 1) * CELL - 3, (fy + 1) * CELL - 3,
+                      fill=FOOD, outline="")
+        for i, (x, y) in enumerate(self.snake):
+            c.create_rectangle(x * CELL + 1, y * CELL + 1,
+                               (x + 1) * CELL - 1, (y + 1) * CELL - 1,
+                               fill=HEAD if i == 0 else BODY, outline="")
+ 
+        self.label.config(text=f"Score: {self.score}    Best: {self.best}")
+        if self.game_over:
+            self.banner("Game over", "Press R to play again")
+        elif self.paused:
+            self.banner("Paused", "Press Space to continue")
+ 
+    def banner(self, title, subtitle):
+        c = self.canvas
+        c.create_text(SIZE / 2, SIZE / 2 - 14, text=title, fill="white",
+                      font=("Georgia", 26, "bold"))
+        c.create_text(SIZE / 2, SIZE / 2 + 20, text=subtitle, fill="white",
+                      font=("Georgia", 13))
+ 
+ 
+if __name__ == "__main__":
+    root = tk.Tk()
+    SnakeGame(root)
+    root.mainloop()
+ 
